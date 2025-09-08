@@ -39,7 +39,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   await loadBooksList();
   populateBookSelect();
-  const table = document.getElementById("reading-table");
+
+  const table = document.getElementById("tableView");
 
   // ========= 工具列按鈕 =========
   document.getElementById("btnMerge").addEventListener("click", () => {
