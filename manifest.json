@@ -1,7 +1,7 @@
 {
   "name": "읽다베이터",
   "short_name": "읽다베이터",
-  "start_url": "./book.html",
+  "start_url": "./read.html",
   "display": "standalone",
   "icons": [
     {
