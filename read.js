@@ -62,7 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const after = range.extractContents();
       const afterHTML = new XMLSerializer().serializeToString(after).trim();
       if (afterHTML) {
-        const index = e.target.closest("[data-index]").dataset.index;
+        const index = e.target.closest("[data-idx]").dataset.idx;
         splitParagraph(index, afterHTML, e.target.dataset.lang, range);
       }
     }
@@ -600,12 +600,12 @@ function setupSwipe(host) {
 
 // ========= 分段 =========
 function splitParagraph(index, afterHTML, lang, range) {
-  const row = document.querySelector(`[data-index="${index}"]`);
+  const row = document.querySelector(`[data-idx="${index}"]`);
   if (!row) return;
 
   // 複製當前 row
   const newRow = row.cloneNode(true);
-  newRow.dataset.index = parseFloat(index) + 0.1; // 臨時 index
+  newRow.dataset.idx = parseFloat(index) + 0.1; // 臨時 index
 
   // 只在指定語言 cell 插入新內容
   newRow.querySelectorAll(".cell").forEach(cell => {
@@ -636,7 +636,7 @@ tableView.addEventListener("click", e => {
 
 // ========= 合併 =========
 function mergeRow(index, lang) {
-  const row = document.querySelector(`[data-index="${index}"]`);
+  const row = document.querySelector(`[data-idx="${index}"]`);
   const prev = row?.previousElementSibling;
   if (!row || !prev) return;
 
@@ -656,7 +656,7 @@ function mergeRow(index, lang) {
 
 // ========= 刪除 =========
 function deleteRow(index, lang) {
-  const row = document.querySelector(`[data-index="${index}"]`);
+  const row = document.querySelector(`[data-idx="${index}"]`);
   if (!row) return;
 
   const cell = row.querySelector(`.${lang}-cell`);
@@ -682,22 +682,14 @@ function cleanEmptyRow(row) {
 
 function reindexRows() {
   document.querySelectorAll("#reading-table tr").forEach((row, i) => {
-    row.dataset.index = i + 1;
+    row.dataset.idx = i + 1;
   });
 }
 
 function getCurrentCellInfo() {
-  // const sel = window.getSelection();
-  const sel = activeCell;
-  if (!sel.rangeCount) return null;
-  let node = sel.anchorNode;
-  while (node && !node.classList?.contains("cell")) {
-    node = node.parentNode;
-  }
-  if (!node) return null;
-
+  const node = activeCell;
   return {
-    index: node.closest("[data-index]").dataset.index,
+    index: node.closest("[data-idx]").dataset.idx,
     lang: node.dataset.lang
   };
 }
