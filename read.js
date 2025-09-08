@@ -623,6 +623,16 @@ function splitParagraph(index, afterHTML, lang, range) {
   reindexRows();
 }
 
+let activeCell = null;
+// 點擊表格時設定 activeCell
+tableView.addEventListener("click", e => {
+  if (e.target.closest("td")) {
+    tableView.querySelectorAll('td, th').forEach(r => r.classList.remove("active"));
+    activeCell = e.target.closest("td");
+    activeCell.classList.add("active");
+  }
+});
+
 
 // ========= 合併 =========
 function mergeRow(index, lang) {
@@ -677,7 +687,8 @@ function reindexRows() {
 }
 
 function getCurrentCellInfo() {
-  const sel = window.getSelection();
+  // const sel = window.getSelection();
+  const sel = activeCell;
   if (!sel.rangeCount) return null;
   let node = sel.anchorNode;
   while (node && !node.classList?.contains("cell")) {
