@@ -42,12 +42,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const table = document.getElementById("reading-table");
 
   // ========= 工具列按鈕 =========
-  document.getElementById("btn-merge").addEventListener("click", () => {
+  document.getElementById("btnMerge").addEventListener("click", () => {
     const info = getCurrentCellInfo();
     if (info) mergeRow(info.index, info.lang);
   });
 
-  document.getElementById("btn-delete").addEventListener("click", () => {
+  document.getElementById("btnDelete").addEventListener("click", () => {
     const info = getCurrentCellInfo();
     if (info) deleteRow(info.index, info.lang);
   });
