@@ -405,66 +405,6 @@ function placeCaretAtStart(el) {
   sel.addRange(r);
 }
 
-/* ====== 合併、刪除 ====== */
-function onMergeRow() {
-  const { idx } = lastFocused;
-  if (idx <= 0) return alert('沒有上一列可合併。');
-
-  // 把目前列 append 到上一列
-  enSeg[idx-1].html = mergeHTML(enSeg[idx-1].html, enSeg[idx].html);
-  zhSeg[idx-1].html = mergeHTML(zhSeg[idx-1].html, zhSeg[idx].html);
-
-  // 筆記合併
-  const notePrev = notes[idx-1] || '';
-  const noteCurr = notes[idx] || '';
-  notes[idx-1] = mergeHTML(notePrev, noteCurr);
-
-  // 移除目前列
-  enSeg.splice(idx,1);
-  zhSeg.splice(idx,1);
-
-  // 調整 notes index
-  const newNotes = {};
-  Object.keys(notes).map(n=>Number(n)).sort((a,b)=>a-b).forEach(k=>{
-    newNotes[k > idx ? k-1 : k] = notes[k];
-  });
-  notes = newNotes;
-  saveNotes(currentBook?.fileName, notes);
-
-  // 視窗縮一
-  windowSize = Math.max(INITIAL_LOAD, windowSize-1);
-  render(true);
-
-  // 把焦點移到合併後的列
-  setTimeout(()=>{
-    const cell = queryCell(idx-1, lastFocused.lang || 'en') || queryCell(idx-1, 'en');
-    if (cell) cell.focus();
-  },0);
-}
-
-function onDeleteRow() {
-  const { idx } = lastFocused;
-  if (idx < 0) return alert('請先點選一列（英／中／筆記任一欄位）');
-  if (!confirm(`刪除第 ${idx+1} 列？`)) return;
-
-  enSeg.splice(idx,1);
-  zhSeg.splice(idx,1);
-
-  // 調整 notes
-  const newNotes = {};
-  Object.keys(notes).map(n=>Number(n)).sort((a,b)=>a-b).forEach(k=>{
-    if (k < idx) newNotes[k] = notes[k];
-    else if (k > idx) newNotes[k-1] = notes[k];
-  });
-  notes = newNotes;
-  saveNotes(currentBook?.fileName, notes);
-
-  // 視窗調整
-  windowSize = Math.max(Math.min(windowSize, enSeg.length - windowStart), INITIAL_LOAD);
-  if (windowStart >= enSeg.length) windowStart = Math.max(0, enSeg.length-1);
-  render(true);
-}
-
 function mergeHTML(a,b) {
   if (!a) return b || '';
   if (!b) return a || '';
@@ -491,7 +431,8 @@ async function onSave() {
 
   try {
     await saveToGitHubJson(`books/list.json`, newList, `chore(read): update progress for ${currentBook.fileName} => ${newProgress}`);
-    await saveToGitHubRaw(`books/${currentBook.fileName}/zh.html`, zhInner, `feat(read): update zh.html for ${currentBook.fileName}`);
+    await saveToGitHubRaw(`${currentBook.fileName}/en.html`, enInner);
+    await saveToGitHubRaw(`${currentBook.fileName}/zh.html`, zhInner);
 
     alert('已儲存進度與中文檔。');
     // 更新本地 booksList 與 currentBook
@@ -504,54 +445,35 @@ async function onSave() {
 }
 
 /* ====== GitHub API（可改成呼叫你的 proxy） ====== */
-async function saveToGitHubJson(path, obj, message) {
+
+const backendURL = "httos://newsbeiter.onrender.com";
+async function saveToGitHubJson(path, obj) {
   const content = new TextEncoder().encode(JSON.stringify(obj, null, 2));
   const b64 = btoa(String.fromCharCode(...content));
-  return uploadContent(path, b64, message);
+  return uploadContent(path, b64);
 }
-async function saveToGitHubRaw(path, raw, message) {
+async function saveToGitHubRaw(path, raw) {
   const b = new TextEncoder().encode(raw);
   const b64 = btoa(String.fromCharCode(...b));
-  return uploadContent(path, b64, message);
+  return uploadContent(path, b64);
 }
-async function uploadContent(path, base64Content, message) {
-  // 先拿 sha（若檔案存在）
-  const sha = await getShaIfExists(path);
-  const url = `https://api.github.com/repos/${CONFIG.OWNER}/${CONFIG.REPO}/contents/${encodeURIComponent(path)}`;
+async function uploadContent(path, base64Content) {
+  const url = `${backendURL}/read/replace`;
   const body = {
-    message,
+    path: path,
     content: base64Content,
     branch: CONFIG.BRANCH,
     ...(sha ? { sha } : {})
   };
   const res = await fetch(url, {
     method: 'PUT',
-    headers: {
-      'Authorization': CONFIG.token ? `Bearer ${CONFIG.token}` : undefined,
-      'Accept': 'application/vnd.github+json',
-      'Content-Type': 'application/json'
-    },
+    headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(body)
   });
   if (!res.ok) {
     const t = await res.text();
     throw new Error(`GitHub upload failed: ${res.status} ${t}`);
   }
-  return res.json();
-}
-
-async function getShaIfExists(path) {
-  const url = `https://api.github.com/repos/${CONFIG.OWNER}/${CONFIG.REPO}/contents/${encodeURIComponent(path)}?ref=${CONFIG.BRANCH}`;
-  const res = await fetch(url, {
-    headers: {
-      'Authorization': CONFIG.token ? `Bearer ${CONFIG.token}` : undefined,
-      'Accept': 'application/vnd.github+json'
-    }
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`Get sha failed: ${res.status}`);
-  const data = await res.json();
-  return data.sha || null;
 }
 
 /* ====== 筆記（localStorage） ====== */
@@ -580,8 +502,6 @@ function setupSwipe(host) {
     startY = null;
   }, {passive:true});
 }
-
-
 
 
 
@@ -634,54 +554,31 @@ tableView.addEventListener("click", e => {
 });
 
 
-// ========= 合併 =========
 function mergeRow(index, lang) {
-  const row = document.querySelector(`[data-idx="${index}"]`);
-  const prev = row?.previousElementSibling;
-  if (!row || !prev) return;
-
-  const currCell = row.querySelector(`.${lang}-cell`);console.log(currCell);
-  const prevCell = prev.querySelector(`.${lang}-cell`);console.log(prevCell);
-
+  const currCell = activeCell;
+  const prevCell = activeCell.closest('tr').previousElementSibling.querySelector(`[data-lang="${activeCell.dataset.lang}"]`);
   if (currCell && prevCell) {
     prevCell.innerHTML += currCell.innerHTML;
-    currCell.remove();
+    currCell.innerHTML = "";
   }
-
-  // 如果整行沒內容就刪掉
-  cleanEmptyRow(row);
+  cleanEmptyRow();
   reindexRows();
 }
 
 
 // ========= 刪除 =========
 function deleteRow(index, lang) {
-  const row = document.querySelector(`[data-idx="${index}"]`);
-  if (!row) return;
-
-  const cell = row.querySelector(`.${lang}-cell`);
-  if (cell) cell.remove();
-
-  // 如果整行沒內容就刪掉
-  cleanEmptyRow(row);
+  if (activeCell) {activeCell.closest('tr').remove()};
+  cleanEmptyRow();
   reindexRows();
 }
 
-
-// ========= 工具函式 =========
-function cleanEmptyRow(row) {
-  const hasContent =
-    row.querySelector(".en-cell") ||
-    row.querySelector(".zh-cell") ||
-    row.querySelector(".note-cell");
-
-  if (!hasContent) {
-    row.remove();
-  }
+function cleanEmptyRow() {
+  tableView.querySelectorAll('#tableView tr').forEach(r=>{if (r.innerText.trim()===""){r.remove()}});
 }
 
 function reindexRows() {
-  document.querySelectorAll("#reading-table tr").forEach((row, i) => {
+  document.querySelectorAll("#tableView tr").forEach((row, i) => {
     row.dataset.idx = i + 1;
   });
 }
