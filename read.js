@@ -22,22 +22,61 @@ let windowSize = INITIAL_LOAD; // 目前已載入數量
 let lastFocused = { idx: -1, lang: null }; // lang: 'en'|'zh'|'note'
 
 /* ====== 初始化 ====== */
-document.addEventListener('DOMContentLoaded', async () => {
+// document.addEventListener('DOMContentLoaded', async () => {
+//   bindToolbar();
+//   bindScrollers();
+
+//   await loadBooksList();
+//   populateBookSelect();
+
+//   // 手機 swipe 輔助（加強感知）
+//   setupSwipe(document.getElementById('scrollHostCard'));
+// });
+
+document.addEventListener("DOMContentLoaded", async () => {
   bindToolbar();
   bindScrollers();
 
   await loadBooksList();
   populateBookSelect();
+  const table = document.getElementById("reading-table");
+
+  // ========= 工具列按鈕 =========
+  document.getElementById("btn-merge").addEventListener("click", () => {
+    const info = getCurrentCellInfo();
+    if (info) mergeRow(info.index, info.lang);
+  });
+
+  document.getElementById("btn-delete").addEventListener("click", () => {
+    const info = getCurrentCellInfo();
+    if (info) deleteRow(info.index, info.lang);
+  });
+
+  // ========= 初始化編輯事件 =========
+  table.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target.classList.contains("cell")) {
+      e.preventDefault();
+      const sel = window.getSelection();
+      const range = sel.getRangeAt(0);
+      const after = range.extractContents();
+      const afterHTML = new XMLSerializer().serializeToString(after).trim();
+      if (afterHTML) {
+        const index = e.target.closest("[data-index]").dataset.index;
+        splitParagraph(index, afterHTML, e.target.dataset.lang, range);
+      }
+    }
+  });
 
   // 手機 swipe 輔助（加強感知）
   setupSwipe(document.getElementById('scrollHostCard'));
 });
 
+
 /* ====== UI 綁定 ====== */
 function bindToolbar() {
   document.getElementById('bookSelect').addEventListener('change', onBookChange);
-  document.getElementById('btnMerge').addEventListener('click', onMergeRow);
-  document.getElementById('btnDelete').addEventListener('click', onDeleteRow);
+  document.getElementById('btnMerge').addEventListener('click', mergeRow);
+  document.getElementById('btnDelete').addEventListener('click', deleteRow);
   document.getElementById('btnSave').addEventListener('click', onSave);
 }
 
@@ -70,7 +109,7 @@ async function loadBooksList() {
 function populateBookSelect() {
   const sel = document.getElementById('bookSelect');
   sel.innerHTML = '<option value="">請選擇...</option>' + booksList.map((b,i) =>
-    `<option value="${i}">${b.name} — ${b.author}</option>`
+    `<option value="${i}">${b.name} - ${b.author}</option>`
   ).join('');
 }
 
@@ -555,35 +594,7 @@ function setupSwipe(host) {
 
 
 
-document.addEventListener("DOMContentLoaded", () => {
-  const table = document.getElementById("reading-table");
 
-  // ========= 工具列按鈕 =========
-  document.getElementById("btn-merge").addEventListener("click", () => {
-    const info = getCurrentCellInfo();
-    if (info) mergeRow(info.index, info.lang);
-  });
-
-  document.getElementById("btn-delete").addEventListener("click", () => {
-    const info = getCurrentCellInfo();
-    if (info) deleteRow(info.index, info.lang);
-  });
-
-  // ========= 初始化編輯事件 =========
-  table.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && e.target.classList.contains("cell")) {
-      e.preventDefault();
-      const sel = window.getSelection();
-      const range = sel.getRangeAt(0);
-      const after = range.extractContents();
-      const afterHTML = new XMLSerializer().serializeToString(after).trim();
-      if (afterHTML) {
-        const index = e.target.closest("[data-index]").dataset.index;
-        splitParagraph(index, afterHTML, e.target.dataset.lang, range);
-      }
-    }
-  });
-});
 
 
 // ========= 分段 =========
