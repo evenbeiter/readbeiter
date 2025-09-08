@@ -9,7 +9,7 @@ const CONFIG = {
 /* ======================================= */
 
 const SELECTORS = 'h1,h2,h3,p'; // 取最上層段落用
-const INITIAL_LOAD = 50;
+const INITIAL_LOAD = 30;
 const PAGE_LOAD = 30;
 
 let booksList = [];            // [{name,fileName,author,progress}]
@@ -44,7 +44,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ========= 工具列按鈕 =========
   document.getElementById("btnMerge").addEventListener("click", () => {
-    const info = getCurrentCellInfo();
+    const info = getCurrentCellInfo();console.log(info);
     if (info) mergeRow(info.index, info.lang);
   });
 
