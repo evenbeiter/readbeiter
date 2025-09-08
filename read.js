@@ -630,8 +630,8 @@ function mergeRow(index, lang) {
   const prev = row?.previousElementSibling;
   if (!row || !prev) return;
 
-  const currCell = row.querySelector(`.${lang}-cell`);
-  const prevCell = prev.querySelector(`.${lang}-cell`);
+  const currCell = row.querySelector(`.${lang}-cell`);console.log(currCell);
+  const prevCell = prev.querySelector(`.${lang}-cell`);console.log(prevCell);
 
   if (currCell && prevCell) {
     prevCell.innerHTML += currCell.innerHTML;
