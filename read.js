@@ -34,7 +34,7 @@ let lastFocused = { idx: -1, lang: null }; // lang: 'en'|'zh'|'note'
 // });
 
 document.addEventListener("DOMContentLoaded", async () => {
-  bindToolbar();
+  // bindToolbar();
   bindScrollers();
 
   await loadBooksList();
@@ -75,8 +75,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 /* ====== UI 綁定 ====== */
 function bindToolbar() {
   document.getElementById('bookSelect').addEventListener('change', onBookChange);
-  document.getElementById('btnMerge').addEventListener('click', mergeRow);
-  document.getElementById('btnDelete').addEventListener('click', deleteRow);
+  document.getElementById('btnMerge').addEventListener('click', onMergeRow);
+  document.getElementById('btnDelete').addEventListener('click',onDeleteRow);
   document.getElementById('btnSave').addEventListener('click', onSave);
 }
 
