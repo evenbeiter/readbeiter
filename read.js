@@ -310,7 +310,7 @@ function bindEditableCell(el) {
 
     if (lang === 'en') enSeg[idx].html = html;
     else if (lang === 'zh') zhSeg[idx].html = html;
-    //else { notes[idx] = html;}
+    else { notes[idx] = html;}
 
     el.textContent = toText(html);
     el.classList.add('display-text');
@@ -424,6 +424,8 @@ async function onSave() {
   // 產生 en, zh 的 innerHTML（用原 tag 保留）
   const enInner = enSeg.map(seg => `<${seg.tag}>${seg.html}</${seg.tag}>`).join('\n');
   const zhInner = zhSeg.map(seg => `<${seg.tag}>${seg.html}</${seg.tag}>`).join('\n');
+  notes = {};
+  notes = document.querySelectorAll('[data-lang="note"]').forEach(c=>{if(c.innerText!=='')notes[c.previousElementSibling.previousElementSibling.dataset.idx]=c.innerText});
 
   // 更新 list.json 的 progress
   const newList = booksList.map(item => {
