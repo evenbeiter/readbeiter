@@ -11,6 +11,7 @@ const CONFIG = {
 const SELECTORS = 'h1,h2,h3,p'; // 取最上層段落用
 const INITIAL_LOAD = 30;
 const PAGE_LOAD = 30;
+const backendURL = "https://newsbeiter.onrender.com";
 
 let booksList = [];            // [{name,fileName,author,progress}]
 let currentBook = null;        // 上述物件
@@ -103,8 +104,15 @@ function bindScrollers() {
 
 /* ====== 資料載入 ====== */
 async function loadBooksList() {
-  const res = await fetch('books/list.json', { cache: 'no-store' });
-  booksList = await res.json();
+  url=`${backendURL}/note/read`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({category:'book', path:'list.txt'})
+  });
+  if (!res.ok) throw new Error('無法讀取書籍列表');
+  const raw = await res.json();
+  raw.forEach(item => {booksList.push(JSON.parse(item))});
 }
 
 function populateBookSelect() {
@@ -120,19 +128,22 @@ async function onBookChange(e) {
   currentBook = booksList[Number(idx)];
   notes = loadNotes(currentBook.fileName);
 
-  const base = `books/${currentBook.fileName}`;
+  //const base = `books/${currentBook.fileName}`;
   const [enHTML, zhHTML] = await Promise.all([
-    fetch(`${base}/en.html?no=${Date.now()}`).then(r=>r.text()),
-    fetch(`${base}/zh.html?no=${Date.now()}`).then(r=>r.text()),
+    fetch(`${backendURL}/note/read`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({category:'book', path:`${currentBook.fileName}/en.txt`})
+    }).then(r => r.json());    
+    fetch(`${backendURL}/note/read`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({category:'book', path:`${currentBook.fileName}/zh.txt`})
+    }).then(r => r.json());
   ]);
-  enSeg = extractTopLevelSegments(enHTML);
-  zhSeg = extractTopLevelSegments(zhHTML);
 
-  // 與英文段落數對齊（不足的中文補空段）
-  if (zhSeg.length < enSeg.length) {
-    const delta = enSeg.length - zhSeg.length;
-    for (let i=0;i<delta;i++) zhSeg.push({tag:'p', html:''});
-  }
+  enHTML.forEach(h=>{enSeg.puah(extractSegments(h))});
+  zhHTML.forEach(h=>{zhSeg.puah(extractSegments(h))});
 
   // 設定視窗
   windowStart = Math.max(0, Math.min(currentBook.progress || 0, enSeg.length-1));
@@ -143,17 +154,9 @@ async function onBookChange(e) {
 }
 
 /* ====== 段落抽取 ====== */
-function extractTopLevelSegments(html) {
-  // 用 DOMParser，僅擷取 body 直屬的 h1/h2/h3/p（忽略包在內層的）
+function extractSegments(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
-  const body = doc.body;
-  const nodes = [];
-  [...body.childNodes].forEach(node => {
-    if (node.nodeType === 1 && node.matches && node.matches(SELECTORS)) {
-      nodes.push({ tag: node.tagName.toLowerCase(), html: node.innerHTML.trim() });
-    }
-  });
-  return nodes;
+  return {tag:doc.tagName.toLowerCase(), html:doc.innerHTML.trim()};
 }
 
 /* ====== 視窗載入/滾動 ====== */
@@ -446,7 +449,6 @@ async function onSave() {
 
 /* ====== GitHub API（可改成呼叫你的 proxy） ====== */
 
-const backendURL = "httos://newsbeiter.onrender.com";
 async function saveToGitHubJson(path, obj) {
   const content = new TextEncoder().encode(JSON.stringify(obj, null, 2));
   const b64 = btoa(String.fromCharCode(...content));

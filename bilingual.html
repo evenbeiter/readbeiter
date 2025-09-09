@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bilingual EPUB Generator</title>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+</head>
+<body>
+  <h2>Upload EPUBs</h2>
+  <input type="file" id="uploadEnglish" accept=".epub">
+  <input type="file" id="uploadChinese" accept=".epub">
+  <br><br>
+
+  <h3>English EPUB (editable)</h3>
+  <textarea id="englishText" style="width:45%;height:200px;"></textarea>
+
+  <h3>Chinese EPUB (editable)</h3>
+  <textarea id="chineseText" style="width:45%;height:200px;"></textarea>
+
+  <br><br>
+  <button id="generateBtn">Generate Bilingual</button>
+  <button id="copyBtn">Copy Result innerHTML</button>
+  <button id="exportBtn">Export EPUB</button>
+
+  <h3>Bilingual Result</h3>
+  <div id="result" style="border:1px solid black; padding:10px; width:90%; min-height:200px;"></div>
+
+<script>
+async function parseEpub(file) {
+  const zip = await JSZip.loadAsync(file);
+  const container = await zip.file("META-INF/container.xml").async("string");
+  const parser = new DOMParser();
+  const containerDoc = parser.parseFromString(container, "application/xml");
+  const opfPath = containerDoc.querySelector("rootfile").getAttribute("full-path");
+
+  const opfText = await zip.file(opfPath).async("string");
+  const opfDoc = parser.parseFromString(opfText, "application/xml");
+
+  const manifest = {};
+  opfDoc.querySelectorAll("manifest > item").forEach(item => {
+    manifest[item.getAttribute("id")] = item.getAttribute("href");
+  });
+
+  const spineItems = [];
+  opfDoc.querySelectorAll("spine > itemref").forEach(itemref => {
+    const idref = itemref.getAttribute("idref");
+    spineItems.push(manifest[idref]);
+  });
+
+  const basePath = opfPath.substring(0, opfPath.lastIndexOf("/") + 1);
+  const chapters = [];
+  for (const href of spineItems) {
+    const filePath = basePath + href;
+    if (zip.file(filePath)) {
+      const nodes = [];
+      const content = await zip.file(filePath).async("string");
+      //const content = raw.replace(/<p[\s\S]*?>/g,'<p>').replace(/<h1[\s\S]*?>/g,'<h1>').replace(/<h2[\s\S]*?>/g,'<h2>').replace(/<h3[\s\S]*?>/g,'<h3>').replace(/<hr[\s\S]*?>/g,'<hr>').replace(/<span[\s\S]*?>/g,'<span>').replace(/<div[\s\S]*?>/g,'<div>');
+      const doc = parser.parseFromString(content, "application/xhtml+xml");
+      [...doc.body.children].forEach(c => {
+        if(SELECTORS.includes(c.tagName.toLocaleLowerCase())) {chapters.push(c.outerHTML.trim().replace(/<p[\s\S]*?>/g,'<p>').replace(/<h1[\s\S]*?>/g,'<h1>').replace(/<h2[\s\S]*?>/g,'<h2>').replace(/<h3[\s\S]*?>/g,'<h3>').replace(/<hr[\s\S]*?>/g,'<hr>').replace(/<span[\s\S]*?>/g,'<span>').replace(/<div[\s\S]*?>/g,'<div>').replace(/<a[\s\S]*?>/g,'').replaceAll('</a>',''))};
+        //if(c.outerHTML.includes('<img')) c.querySelectorAll("img").forEach(img=>{chapters.push(img.src)});
+      });
+    }
+    chapters.push("<h2>=== CHAPTER BREAK ===</h2>");
+  }
+  return chapters;
+}
+
+const SELECTORS = 'h1,h2,h3,h4,h5,h6,p,li,table,hr'; // 取最上層段落用
+const backendURL = 'https://newsbeiter.onrender.com';
+let englishChapters = [];
+let chineseChapters = [];
+
+document.getElementById("uploadEnglish").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    englishChapters = await parseEpub(file);console.log(englishChapters);
+    document.getElementById("englishText").value = englishChapters.join("\n");
+  }
+});
+
+document.getElementById("uploadChinese").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    chineseChapters = await parseEpub(file);console.log(chineseChapters);
+    document.getElementById("chineseText").value = chineseChapters.join("\n");
+  }
+});
+
+document.getElementById("generateBtn").addEventListener("click", () => {
+  // 使用 textarea 的文字（因為使用者可能調整過）
+  const englishText = document.getElementById("englishText").value;
+  const chineseText = document.getElementById("chineseText").value;
+
+  englishChapters = englishText.split(/=== CHAPTER BREAK ===/).map(ch => ch.trim()).filter(Boolean);
+  chineseChapters = chineseText.split(/=== CHAPTER BREAK ===/).map(ch => ch.trim()).filter(Boolean);
+
+  const resultDiv = document.getElementById("result");
+  resultDiv.innerHTML = "";
+
+  const maxChapters = Math.max(englishChapters.length, chineseChapters.length);
+  for (let c = 0; c < maxChapters; c++) {
+    const enParas = (englishChapters[c] || "").split(/\n+/).filter(Boolean);
+    const zhParas = (chineseChapters[c] || "").split(/\n+/).filter(Boolean);
+
+    resultDiv.innerHTML += `<h3>Chapter ${c+1}</h3>`;
+    const maxLen = Math.max(enParas.length, zhParas.length);
+    for (let i = 0; i < maxLen; i++) {
+      const en = enParas[i] || "";
+      const zh = zhParas[i] || "";
+      resultDiv.innerHTML += `<p><b>EN:</b> ${en}</p><p><b>ZH:</b> ${zh}</p>`;
+    }
+  }
+});
+
+document.getElementById("copyBtn").addEventListener("click", () => {
+  const htmlContent = document.getElementById("result").innerHTML;
+  navigator.clipboard.writeText(htmlContent).then(() => {
+    alert("Result innerHTML copied!");
+  });
+});
+
+document.getElementById("exportBtn").addEventListener("click", async () => {
+  const zip = new JSZip();
+  zip.file("mimetype", "application/epub+zip");
+  zip.file("META-INF/container.xml", `<?xml version="1.0"?>
+    <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+      <rootfiles>
+        <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+      </rootfiles>
+    </container>`);
+
+  let manifest = "";
+  let spine = "";
+  let chapterFiles = "";
+
+  for (let i = 0; i < Math.max(englishChapters.length, chineseChapters.length); i++) {
+    const enParas = (englishChapters[i] || "").split(/\n+/).filter(Boolean);
+    const zhParas = (chineseChapters[i] || "").split(/\n+/).filter(Boolean);
+
+    let chapterHTML = `<h2>Chapter ${i+1}</h2>`;
+    const maxLen = Math.max(enParas.length, zhParas.length);
+    for (let j = 0; j < maxLen; j++) {
+      const en = enParas[j] || "";
+      const zh = zhParas[j] || "";
+      chapterHTML += `<p><b>EN:</b> ${en}</p><p><b>ZH:</b> ${zh}</p>`;
+    }
+
+    const filename = `chap${i+1}.xhtml`;
+    zip.file("OEBPS/" + filename, `<?xml version="1.0" encoding="utf-8"?>
+      <html xmlns="http://www.w3.org/1999/xhtml">
+      <head><title>Chapter ${i+1}</title></head>
+      <body>${chapterHTML}</body></html>`);
+
+    manifest += `<item id="chap${i+1}" href="${filename}" media-type="application/xhtml+xml"/>`;
+    spine += `<itemref idref="chap${i+1}"/>`;
+  }
+
+  const opf = `<?xml version="1.0"?>
+    <package xmlns="http://www.idpf.org/2007/opf" unique-identifier="BookId" version="3.0">
+      <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+        <dc:title>Bilingual EPUB</dc:title>
+        <dc:language>en</dc:language>
+      </metadata>
+      <manifest>${manifest}</manifest>
+      <spine>${spine}</spine>
+    </package>`;
+
+  zip.file("OEBPS/content.opf", opf);
+
+  const blob = await zip.generateAsync({type:"blob"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "bilingual.epub";
+  a.click();
+});
+</script>
+</body>
+</html>
