@@ -422,7 +422,12 @@ async function onSave() {
   const newProgress = Math.max(0, bottomIndex - 30);
 
   // 產生 en, zh 的 innerHTML（用原 tag 保留）
-  const enInner = enSeg.map(seg => {if(seg)`<${seg.tag}>${seg.html}</${seg.tag}>`}).join('\n');
+  const enInner = enSeg
+  .filter(seg => seg && seg.html) // 只要 seg 存在而且有 html
+  .map(seg => `<${seg.tag || "span"}>${seg.html}</${seg.tag || "span"}>`)
+  .join('\n');
+
+  //const enInner = enSeg.map(seg => {if(seg)`<${seg.tag}>${seg.html}</${seg.tag}>`}).join('\n');
   const zhInner = zhSeg.map(seg => {if(seg)`<${seg.tag}>${seg.html}</${seg.tag}>`}).join('\n');
   notes = {};
   notes = document.querySelectorAll('[data-lang="note"]').forEach(c=>{if(c.innerText!=='')notes[c.previousElementSibling.previousElementSibling.dataset.idx]=c.innerText});
