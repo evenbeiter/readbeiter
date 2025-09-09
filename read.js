@@ -134,16 +134,16 @@ async function onBookChange(e) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({category:'book', path:`${currentBook.fileName}/en.txt`})
-    }).then(r => r.json();console.log(r.json())), 
+    }).then(r => r.json()), 
     fetch(`${backendURL}/note/read`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({category:'book', path:`${currentBook.fileName}/zh.txt`})
-    }).then(r => r.json();console.log(r.json())),
+    }).then(r => r.json()),
   ]);
-  console.log([enHTML, zhHTML]);
-  enHTML.forEach(h=>{enSeg.puah(extractSegments(h))});
-  zhHTML.forEach(h=>{zhSeg.puah(extractSegments(h))});
+  console.log('html: '+[enHTML, zhHTML]);
+  enHTML.forEach(h=>{enSeg.push(extractSegments(h))});
+  zhHTML.forEach(h=>{zhSeg.push(extractSegments(h))});
 
   // 設定視窗
   windowStart = Math.max(0, Math.min(currentBook.progress || 0, enSeg.length-1));
@@ -154,7 +154,7 @@ async function onBookChange(e) {
 }
 
 /* ====== 段落抽取 ====== */
-function extractSegments(html) {
+function extractSegments(html) {console.log(html);
   const doc = new DOMParser().parseFromString(html, 'text/html');
   return {tag:doc.tagName.toLowerCase(), html:doc.innerHTML.trim()};
 }
