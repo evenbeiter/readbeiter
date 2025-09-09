@@ -17,7 +17,7 @@ let booksList = [];            // [{name,fileName,author,progress}]
 let currentBook = null;        // 上述物件
 let enSeg = [];                // [{tag, html}]
 let zhSeg = [];                // [{tag, html}]
-let notes = {};                // { idx: html } 存 localStorage
+let notes = {};                // { idx: html } 存 localStorage format>> {idx:'',idx:''}
 let windowStart = 0;           // 目前視窗起始 index
 let windowSize = INITIAL_LOAD; // 目前已載入數量
 let lastFocused = { idx: -1, lang: null }; // lang: 'en'|'zh'|'note'
@@ -126,10 +126,10 @@ async function onBookChange(e) {
   const idx = e.target.value;
   if (idx === '') return;
   currentBook = booksList[Number(idx)];
-  notes = loadNotes(currentBook.fileName);
+  //notes = loadNotes(currentBook.fileName);
 
   //const base = `books/${currentBook.fileName}`;
-  const [enHTML, zhHTML] = await Promise.all([
+  const [enHTML, zhHTML, notesRaw] = await Promise.all([
     fetch(`${backendURL}/note/read`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -140,10 +140,16 @@ async function onBookChange(e) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({category:'book', path:`${currentBook.fileName}/zh.txt`})
     }).then(r => r.json()),
+    fetch(`${backendURL}/note/read`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({category:'book', path:`${currentBook.fileName}/note.txt`})
+    }).then(r => r.json()),
   ]);
   console.log('html: '+[enHTML, zhHTML]);
-  enHTML.forEach(h=>{console.log(h);enSeg.push(extractSegments(h))});
-  zhHTML.forEach(h=>{console.log(h);zhSeg.push(extractSegments(h))});
+  enHTML.forEach(h=> {if(h) enSeg.push(extractSegments(h))});
+  zhHTML.forEach(h=> {if(h) zhSeg.push(extractSegments(h))});
+  notes = notesRaw;
 
   // 設定視窗
   windowStart = Math.max(0, Math.min(currentBook.progress || 0, enSeg.length-1));
@@ -157,7 +163,7 @@ async function onBookChange(e) {
 function extractSegments(html) {console.log(html);
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const t = doc.body.firstChild;
-  return {tag:t.tagName.toLowerCase(), html:t.innerHTML.trim()};
+  if (t) return {tag:t.tagName.toLowerCase(), html:t.innerHTML.trim()};
 }
 
 /* ====== 視窗載入/滾動 ====== */
@@ -257,7 +263,7 @@ function renderCardHTML(idx) {
   const note = notes[idx] || '';
   return `
     <div class="card seg-card" data-idx="${idx}">
-      <div class="card-body">
+      <div class="card-body sepia">
         <div class="label">#${idx+1} English</div>
         <div class="segment-cell display-text" data-idx="${idx}" data-lang="en">${toText(en.html)}</div>
 
@@ -304,7 +310,7 @@ function bindEditableCell(el) {
 
     if (lang === 'en') enSeg[idx].html = html;
     else if (lang === 'zh') zhSeg[idx].html = html;
-    else { notes[idx] = html; saveNotes(currentBook?.fileName, notes); }
+    //else { notes[idx] = html;}
 
     el.textContent = toText(html);
     el.classList.add('display-text');
@@ -362,13 +368,6 @@ function handleEnterSplit(el, idx, lang) {
     zhSeg.splice(idx+1, 0, { tag: zhSeg[idx].tag || 'p', html: afterHTML });
     // 英文順移
     //enSeg.splice(idx+1, 0, { tag: enSeg[idx]?.tag || 'p', html: '' });
-  } else {
-    // 筆記：單純把筆記拆段（不影響英／中對齊）
-    const b = notes[idx] || beforeHTML;
-    notes[idx] = beforeHTML;
-    shiftArrayNotes(idx+1);
-    notes[idx+1] = afterHTML;
-    saveNotes(currentBook?.fileName, notes);
   }
 
   // 筆記也跟著順移（確保對齊）
@@ -422,7 +421,7 @@ async function onSave() {
   const bottomIndex = windowStart + windowSize - 1; // 視窗底部
   const newProgress = Math.max(0, bottomIndex - 30);
 
-  // 產生 en, zh.html 的 innerHTML（用原 tag 保留）
+  // 產生 en, zh 的 innerHTML（用原 tag 保留）
   const enInner = enSeg.map(seg => `<${seg.tag}>${seg.html}</${seg.tag}>`).join('\n');
   const zhInner = zhSeg.map(seg => `<${seg.tag}>${seg.html}</${seg.tag}>`).join('\n');
 
@@ -438,11 +437,12 @@ async function onSave() {
     await updateContent('list.txt', newList.join('\n'));
     await updateContent(`${currentBook.fileName}/en.txt`,enInner);
     await updateContent(`${currentBook.fileName}/zh.txt`,zhInner);
+    await updateContent(`${currentBook.fileName}/note.txt`,JSON.stringify(notes));
     // await saveToGitHubJson(`books/list.json`, newList, `chore(read): update progress for ${currentBook.fileName} => ${newProgress}`);
     // await saveToGitHubRaw(`${currentBook.fileName}/en.html`, enInner);
     // await saveToGitHubRaw(`${currentBook.fileName}/zh.html`, zhInner);
 
-    alert('已儲存進度與中文檔。');
+    alert('儲存成功');
     // 更新本地 booksList 與 currentBook
     booksList = newList;
     currentBook.progress = newProgress;
@@ -462,35 +462,6 @@ async function updateContent(path, content) {
       if (!res.ok) alert('❌ 上傳失敗');
   });
 }
-
-// async function saveToGitHubJson(path, obj) {
-//   const content = new TextEncoder().encode(JSON.stringify(obj, null, 2));
-//   const b64 = btoa(String.fromCharCode(...content));
-//   return uploadContent(path, b64);
-// }
-// async function saveToGitHubRaw(path, raw) {
-//   const b = new TextEncoder().encode(raw);
-//   const b64 = btoa(String.fromCharCode(...b));
-//   return uploadContent(path, b64);
-// }
-// async function uploadContent(path, base64Content) {
-//   const url = `${backendURL}/read/replace`;
-//   const body = {
-//     path: path,
-//     content: base64Content,
-//     branch: CONFIG.BRANCH,
-//     ...(sha ? { sha } : {})
-//   };
-//   const res = await fetch(url, {
-//     method: 'PUT',
-//     headers: {'Content-Type': 'application/json'},
-//     body: JSON.stringify(body)
-//   });
-//   if (!res.ok) {
-//     const t = await res.text();
-//     throw new Error(`GitHub upload failed: ${res.status} ${t}`);
-//   }
-// }
 
 /* ====== 筆記（localStorage） ====== */
 const NOTE_KEY = (file) => `bireader-notes:${file}`;
