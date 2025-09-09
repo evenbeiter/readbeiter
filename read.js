@@ -134,12 +134,12 @@ async function onBookChange(e) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({category:'book', path:`${currentBook.fileName}/en.txt`})
-    }).then(r => r.json());    
+    }).then(r => r.json()), 
     fetch(`${backendURL}/note/read`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({category:'book', path:`${currentBook.fileName}/zh.txt`})
-    }).then(r => r.json());
+    }).then(r => r.json()),
   ]);
 
   enHTML.forEach(h=>{enSeg.puah(extractSegments(h))});
