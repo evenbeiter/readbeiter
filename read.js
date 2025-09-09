@@ -142,8 +142,8 @@ async function onBookChange(e) {
     }).then(r => r.json()),
   ]);
   console.log('html: '+[enHTML, zhHTML]);
-  enHTML.forEach(h=>{enSeg.push(extractSegments(h))});
-  zhHTML.forEach(h=>{zhSeg.push(extractSegments(h))});
+  enHTML.forEach(h=>{console.log(h);enSeg.push(extractSegments(h))});
+  zhHTML.forEach(h=>{console.log(h);zhSeg.push(extractSegments(h))});
 
   // 設定視窗
   windowStart = Math.max(0, Math.min(currentBook.progress || 0, enSeg.length-1));
@@ -156,7 +156,8 @@ async function onBookChange(e) {
 /* ====== 段落抽取 ====== */
 function extractSegments(html) {console.log(html);
   const doc = new DOMParser().parseFromString(html, 'text/html');
-  return {tag:doc.tagName.toLowerCase(), html:doc.innerHTML.trim()};
+  const t = doc.body.firstChild;
+  return {tag:t.tagName.toLowerCase(), html:t.innerHTML.trim()};
 }
 
 /* ====== 視窗載入/滾動 ====== */
