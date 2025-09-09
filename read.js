@@ -355,12 +355,12 @@ function handleEnterSplit(el, idx, lang) {
     enSeg[idx].html = beforeHTML;
     enSeg.splice(idx+1, 0, { tag: enSeg[idx].tag || 'p', html: afterHTML });
     // 中文整體順移一段（不改內容）
-    zhSeg.splice(idx+1, 0, { tag: zhSeg[idx]?.tag || 'p', html: '' });
+    //zhSeg.splice(idx+1, 0, { tag: zhSeg[idx]?.tag || 'p', html: '' });
   } else if (lang === 'zh') {
     zhSeg[idx].html = beforeHTML;
     zhSeg.splice(idx+1, 0, { tag: zhSeg[idx].tag || 'p', html: afterHTML });
     // 英文順移
-    enSeg.splice(idx+1, 0, { tag: enSeg[idx]?.tag || 'p', html: '' });
+    //enSeg.splice(idx+1, 0, { tag: enSeg[idx]?.tag || 'p', html: '' });
   } else {
     // 筆記：單純把筆記拆段（不影響英／中對齊）
     const b = notes[idx] || beforeHTML;
@@ -371,10 +371,10 @@ function handleEnterSplit(el, idx, lang) {
   }
 
   // 筆記也跟著順移（確保對齊）
-  shiftArrayNotes(idx+1);
+  //shiftArrayNotes(idx+1);
 
   // 視窗調整
-  windowSize += 1;
+  //windowSize += 1;
   render(true);
 
   // 把焦點移到下一列同欄位開頭
@@ -421,7 +421,8 @@ async function onSave() {
   const bottomIndex = windowStart + windowSize - 1; // 視窗底部
   const newProgress = Math.max(0, bottomIndex - 30);
 
-  // 產生 zh.html 的 innerHTML（用原 tag 保留）
+  // 產生 en, zh.html 的 innerHTML（用原 tag 保留）
+  const enInner = enSeg.map(seg => `<${seg.tag}>${seg.html}</${seg.tag}>`).join('\n');
   const zhInner = zhSeg.map(seg => `<${seg.tag}>${seg.html}</${seg.tag}>`).join('\n');
 
   // 更新 list.json 的 progress
@@ -433,9 +434,12 @@ async function onSave() {
   });
 
   try {
-    await saveToGitHubJson(`books/list.json`, newList, `chore(read): update progress for ${currentBook.fileName} => ${newProgress}`);
-    await saveToGitHubRaw(`${currentBook.fileName}/en.html`, enInner);
-    await saveToGitHubRaw(`${currentBook.fileName}/zh.html`, zhInner);
+    await updateContent('list.txt', newList.join('\n'));
+    await updateContent(`${currentBook.fileName}/en.txt`,enInner);
+    await updateContent(`${currentBook.fileName}/zh.txt`,zhInner);
+    // await saveToGitHubJson(`books/list.json`, newList, `chore(read): update progress for ${currentBook.fileName} => ${newProgress}`);
+    // await saveToGitHubRaw(`${currentBook.fileName}/en.html`, enInner);
+    // await saveToGitHubRaw(`${currentBook.fileName}/zh.html`, zhInner);
 
     alert('已儲存進度與中文檔。');
     // 更新本地 booksList 與 currentBook
@@ -448,35 +452,44 @@ async function onSave() {
 }
 
 /* ====== GitHub API（可改成呼叫你的 proxy） ====== */
-
-async function saveToGitHubJson(path, obj) {
-  const content = new TextEncoder().encode(JSON.stringify(obj, null, 2));
-  const b64 = btoa(String.fromCharCode(...content));
-  return uploadContent(path, b64);
-}
-async function saveToGitHubRaw(path, raw) {
-  const b = new TextEncoder().encode(raw);
-  const b64 = btoa(String.fromCharCode(...b));
-  return uploadContent(path, b64);
-}
-async function uploadContent(path, base64Content) {
-  const url = `${backendURL}/read/replace`;
-  const body = {
-    path: path,
-    content: base64Content,
-    branch: CONFIG.BRANCH,
-    ...(sha ? { sha } : {})
-  };
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(body)
+async function updateContent(path, content) {
+  fetch(`${backendURL}/note/replace`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({category:'book', path:path, content:content})
+  }).then(res => {
+      if (!res.ok) alert('❌ 上傳失敗');
   });
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`GitHub upload failed: ${res.status} ${t}`);
-  }
 }
+
+// async function saveToGitHubJson(path, obj) {
+//   const content = new TextEncoder().encode(JSON.stringify(obj, null, 2));
+//   const b64 = btoa(String.fromCharCode(...content));
+//   return uploadContent(path, b64);
+// }
+// async function saveToGitHubRaw(path, raw) {
+//   const b = new TextEncoder().encode(raw);
+//   const b64 = btoa(String.fromCharCode(...b));
+//   return uploadContent(path, b64);
+// }
+// async function uploadContent(path, base64Content) {
+//   const url = `${backendURL}/read/replace`;
+//   const body = {
+//     path: path,
+//     content: base64Content,
+//     branch: CONFIG.BRANCH,
+//     ...(sha ? { sha } : {})
+//   };
+//   const res = await fetch(url, {
+//     method: 'PUT',
+//     headers: {'Content-Type': 'application/json'},
+//     body: JSON.stringify(body)
+//   });
+//   if (!res.ok) {
+//     const t = await res.text();
+//     throw new Error(`GitHub upload failed: ${res.status} ${t}`);
+//   }
+// }
 
 /* ====== 筆記（localStorage） ====== */
 const NOTE_KEY = (file) => `bireader-notes:${file}`;
