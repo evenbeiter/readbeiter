@@ -97,15 +97,28 @@
   }
 
   // 解析 EPUB 並建立卡片
+  // async function parseEpub(file, targetCol, lang) {
+  //   const book = ePub(file);
+  //   await book.ready;
+  //   for (const section of book.sections) {
+  //     const htmlDoc = await section.render();
+  //     await processImages(htmlDoc.document);
+  //     targetCol.appendChild(createCard(lang, htmlDoc.document.body.innerHTML));
+  //   }
+  // }
+
   async function parseEpub(file, targetCol, lang) {
     const book = ePub(file);
     await book.ready;
-    for (const section of book.sections) {
-      const htmlDoc = await section.render();
+
+    // 遍歷章節
+    await book.sections.each(async (section) => {
+      const htmlDoc = await section.render(); 
       await processImages(htmlDoc.document);
       targetCol.appendChild(createCard(lang, htmlDoc.document.body.innerHTML));
-    }
+    });
   }
+
 
   // 上傳 EPUB 事件
   document.getElementById("uploadEn").addEventListener("change", async (e) => {
