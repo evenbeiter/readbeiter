@@ -10,7 +10,7 @@
   .editor { display: flex; gap: 20px; }
   .column { flex:1; border:1px solid #ccc; padding:10px; border-radius:6px; min-height:200px; }
   .card { background:#fff; border:1px solid #ddd; padding:8px; border-radius:6px; margin-bottom:10px; }
-  .card div[contenteditable]{ min-height:100px; outline:none; }
+  .card textarea { width:100%; min-height:120px; resize:vertical; }
 </style>
 </head>
 <body class="p-4">
@@ -36,14 +36,14 @@
 </div>
 
 <script>
-const SELECTORS = ['h1','h2','h3','h4','h5','h6','p','li','table','hr'];
+const backendURL = '/upload-image'; // 你的圖片上傳 API
 
-// 建立章節卡片
+// 建立章節卡片（每個章節一個 textarea）
 function createCard(lang, htmlContent){
   const card = document.createElement("div");
   card.className = "card";
   card.innerHTML = `
-    <div contenteditable="true">${htmlContent}</div>
+    <textarea>${htmlContent}</textarea>
     <button class="btn btn-sm btn-danger mt-2 delete-btn" data-lang="${lang}">刪除</button>
   `;
   return card;
@@ -65,13 +65,15 @@ new Sortable(document.getElementById("zhCol"),{animation:150});
 async function uploadImage(file){
   const formData = new FormData();
   formData.append("image", file);
-  const res = await fetch("/upload-image",{method:"POST", body: formData});
+  const res = await fetch(backendURL,{method:"POST",body:formData});
   const data = await res.json();
   return data.url;
 }
 
 // 處理 HTML 中的圖片
-async function processImages(doc){
+async function processImages(html){
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html,"text/html");
   const imgs = doc.querySelectorAll("img");
   for(const img of imgs){
     if(img.src.startsWith("data:")) continue;
@@ -82,9 +84,10 @@ async function processImages(doc){
       img.src = uploadedUrl;
     }catch(e){console.error("圖片上傳失敗:",e);}
   }
+  return doc.body.innerHTML;
 }
 
-// 解析 EPUB
+// 解析 EPUB，每個 spine item 當作一個章節卡片
 async function parseEpub(file, targetCol, lang){
   const zip = await JSZip.loadAsync(file);
   const container = await zip.file("META-INF/container.xml").async("string");
@@ -110,17 +113,10 @@ async function parseEpub(file, targetCol, lang){
   for(const href of spineItems){
     const filePath = basePath + href;
     if(zip.file(filePath)){
-      const content = await zip.file(filePath).async("string");
-      const doc = parser.parseFromString(content,"application/xhtml+xml");
-      await processImages(doc);
-      [...doc.body.children].forEach(c=>{
-        if(SELECTORS.includes(c.tagName.toLowerCase())){
-          targetCol.appendChild(createCard(lang,c.outerHTML));
-        }
-      });
+      let content = await zip.file(filePath).async("string");
+      content = await processImages(content); // 圖片上傳後替換 src
+      targetCol.appendChild(createCard(lang,content));
     }
-    // 可選：加入章節分隔符
-    // targetCol.appendChild(createCard(lang,"<h2>=== CHAPTER BREAK ===</h2>"));
   }
 }
 
@@ -146,19 +142,19 @@ document.getElementById("uploadZh").addEventListener("change", async e=>{
 // 產生檔案清單
 document.getElementById("generateBtn").addEventListener("click",()=>{
   const startIndex = parseInt(document.getElementById("startIndex").value)||0;
-  const enCards = [...document.querySelectorAll("#enCol .card div[contenteditable]")];
-  const zhCards = [...document.querySelectorAll("#zhCol .card div[contenteditable]")];
+  const enCards = [...document.querySelectorAll("#enCol .card textarea")];
+  const zhCards = [...document.querySelectorAll("#zhCol .card textarea")];
 
-  const maxCount = Math.max(enCards.length,zhCards.length)+startIndex;
+  const maxCount = Math.max(enCards.length, zhCards.length)+startIndex;
   const padLength = maxCount>99?3:2;
 
   const enFiles = enCards.map((c,i)=>({
     name:`en-${String(i+startIndex).padStart(padLength,"0")}.txt`,
-    content:c.innerHTML
+    content:c.value
   }));
   const zhFiles = zhCards.map((c,i)=>({
     name:`zh-${String(i+startIndex).padStart(padLength,"0")}.txt`,
-    content:c.innerHTML
+    content:c.value
   }));
 
   console.log("English files:",enFiles);
