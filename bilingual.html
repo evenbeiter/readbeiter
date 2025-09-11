@@ -71,21 +71,35 @@
     new Sortable(document.getElementById("zhCol"), { animation: 150 });
 
     // 解析 EPUB 並加入卡片
+    // async function parseEpub(file, targetCol, lang) {
+    //   const book = ePub(file);
+    //   const rendition = book.renderTo(document.createElement("div"));
+    //   const toc = await book.loaded.navigation;
+
+    //   // 依章節順序載入
+    //   for (const item of toc.toc) {
+    //     const section = await book.load(item.href);
+    //     const html = new TextDecoder().decode(section);
+    //     // 簡單取 <body> 裡的內容
+    //     const match = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    //     const bodyContent = match ? match[1] : html;
+    //     targetCol.appendChild(createCard(lang, bodyContent));
+    //   }
+    // }
+
     async function parseEpub(file, targetCol, lang) {
       const book = ePub(file);
-      const rendition = book.renderTo(document.createElement("div"));
       const toc = await book.loaded.navigation;
 
       // 依章節順序載入
       for (const item of toc.toc) {
-        const section = await book.load(item.href);
-        const html = new TextDecoder().decode(section);
-        // 簡單取 <body> 裡的內容
-        const match = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-        const bodyContent = match ? match[1] : html;
+        const section = await book.section(item.href).render(); // epub.js 0.3.x+
+        // 取得 HTML 內容
+        const bodyContent = section.document.body.innerHTML;
         targetCol.appendChild(createCard(lang, bodyContent));
       }
     }
+
 
     // 上傳英文 EPUB
     document.getElementById("uploadEn").addEventListener("change", async (e) => {
