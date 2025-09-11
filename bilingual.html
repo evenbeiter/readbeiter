@@ -111,12 +111,13 @@
     const book = ePub(file);
     await book.ready;
 
-    // 遍歷章節
-    await book.sections.each(async (section) => {
-      const htmlDoc = await section.render(); 
+    // book.loaded.spine.items 內就是章節
+    for (const item of book.loaded.spine.items) {
+      const section = book.section(item.href);
+      const htmlDoc = await section.render();
       await processImages(htmlDoc.document);
       targetCol.appendChild(createCard(lang, htmlDoc.document.body.innerHTML));
-    });
+    }
   }
 
 
